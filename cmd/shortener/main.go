@@ -25,56 +25,61 @@ func shortenURL(url string) string {
 	return short
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || r.URL.Path != "/" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
+func handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/" {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil || len(body) == 0 {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		originalURL := strings.TrimSpace(string(body))
+		shortID := shortenURL(originalURL)
+
+		mu.Lock()
+		urlStore[shortID] = originalURL
+		mu.Unlock()
+
+		shortURL := fmt.Sprintf("%s", shortID)
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(shortURL))
 	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil || len(body) == 0 {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-	originalURL := strings.TrimSpace(string(body))
-	shortID := shortenURL(originalURL)
-
-	mu.Lock()
-	urlStore[shortID] = originalURL
-	mu.Unlock()
-
-	shortURL := fmt.Sprintf("http://localhost:8080/%s", shortID)
-
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(shortURL))
 }
 
-func handlerGet(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("ID: ", r.PathValue("id"))
-	if r.Method != http.MethodGet {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
+func handlerGet(urlStore map[string]string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("ID: ", r.PathValue("id"))
+		if r.Method != http.MethodGet {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
+
+		id := r.PathValue("id")
+		originalUrl := urlStore[id]
+
+		_, err := io.ReadAll(r.Body)
+		if err != nil || originalUrl == "" {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+
+		fmt.Println("originalUrl: ", originalUrl)
+
+		w.Header().Set("Location", originalUrl)
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
-
-	_, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	id := r.PathValue("id")
-	originalUrl := urlStore[id]
-	fmt.Println("originalUrl: ", originalUrl)
-
-	w.Header().Set("Location", originalUrl)
-	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler)
-	mux.HandleFunc("/{id}", handlerGet)
+	mux.HandleFunc("/", handler())
+	mux.HandleFunc("/{id}", handlerGet(urlStore))
 
 	fmt.Println("Server is running on http://localhost:8080")
 	err := http.ListenAndServe(":8080", mux)

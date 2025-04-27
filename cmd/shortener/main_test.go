@@ -1,0 +1,122 @@
+package main
+
+import (
+	"bytes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func Test_handler(t *testing.T) {
+	type want struct {
+		contentType string
+		statusCode  int
+		body        string
+	}
+	tests := []struct {
+		name    string
+		request string
+		body    string
+		want    want
+	}{
+		{
+			name:    "create short link correct",
+			request: "/",
+			body:    "https://rcimbvs.com/iuymedy",
+			want: want{
+				contentType: "text/plain",
+				statusCode:  201,
+				body:        "-8eOIgoJ",
+			},
+		},
+		{
+			name:    "body is empty",
+			request: "/",
+			body:    "",
+			want: want{
+				contentType: "text/plain; charset=utf-8",
+				statusCode:  400,
+				body:        "Bad Request\n",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
+			w := httptest.NewRecorder()
+			h := handler()
+			h(w, request)
+
+			result := w.Result()
+
+			assert.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+			assert.Equal(t, tt.want.statusCode, result.StatusCode)
+
+			body, err := ioutil.ReadAll(result.Body)
+			require.NoError(t, err)
+			err = result.Body.Close()
+			require.NoError(t, err)
+			assert.Equal(t, tt.want.body, string(body))
+		})
+	}
+}
+
+func Test_handlerGet(t *testing.T) {
+	type want struct {
+		location   string
+		statusCode int
+		body       string
+	}
+	tests := []struct {
+		name     string
+		request  string
+		id       string
+		urlStore map[string]string
+		want     want
+	}{
+		{
+			name:    "get original link correct",
+			request: "/",
+			id:      "-8eOIgoJ",
+			urlStore: map[string]string{
+				"-8eOIgoJ": "https://rcimbvs.com/iuymedy",
+			},
+			want: want{
+				location:   "https://rcimbvs.com/iuymedy",
+				statusCode: 307,
+				body:       "",
+			},
+		},
+		{
+			name:    "wrong short id",
+			request: "/",
+			id:      "-8eOIg",
+			urlStore: map[string]string{
+				"-8eOIgoJ": "https://rcimbvs.com/iuymedy",
+			},
+			want: want{
+				location:   "",
+				statusCode: 400,
+				body:       "Bad Request\n",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := tt.request + tt.id
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			request.SetPathValue("id", tt.id)
+			w := httptest.NewRecorder()
+			h := handlerGet(tt.urlStore)
+			h(w, request)
+
+			result := w.Result()
+
+			assert.Equal(t, tt.want.statusCode, result.StatusCode)
+			assert.Equal(t, tt.want.location, result.Header.Get("Location"))
+		})
+	}
+}
