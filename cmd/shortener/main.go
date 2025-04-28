@@ -4,7 +4,9 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -54,13 +56,13 @@ func handler() http.HandlerFunc {
 
 func handlerGet(urlStore map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("ID: ", r.PathValue("id"))
+		fmt.Println("ID: ", chi.URLParam(r, "id"))
 		if r.Method != http.MethodGet {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
 
-		id := r.PathValue("id")
+		id := chi.URLParam(r, "id")
 		originalUrl := urlStore[id]
 
 		_, err := io.ReadAll(r.Body)
@@ -77,13 +79,20 @@ func handlerGet(urlStore map[string]string) http.HandlerFunc {
 }
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler())
-	mux.HandleFunc("/{id}", handlerGet(urlStore))
+	r := chi.NewRouter()
+	r.Route("/", func(r chi.Router) {
+		r.Post("/", handler())
+		r.Get("/{id}", handlerGet(urlStore))
+	})
 
-	fmt.Println("Server is running on http://localhost:8080")
-	err := http.ListenAndServe(":8080", mux)
-	if err != nil {
-		panic(err)
-	}
+	log.Fatal(http.ListenAndServe(":8080", r))
+	//mux := http.NewServeMux()
+	//mux.HandleFunc("/", handler())
+	//mux.HandleFunc("/{id}", handlerGet(urlStore))
+	//
+	//fmt.Println("Server is running on http://localhost:8080")
+	//err := http.ListenAndServe(":8080", mux)
+	//if err != nil {
+	//	panic(err)
+	//}
 }
