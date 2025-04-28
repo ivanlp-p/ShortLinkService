@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -29,7 +31,7 @@ func Test_handler(t *testing.T) {
 			want: want{
 				contentType: "text/plain",
 				statusCode:  201,
-				body:        "-8eOIgoJ",
+				body:        "http://localhost:8080/-8eOIgoJ",
 			},
 		},
 		{
@@ -79,7 +81,7 @@ func Test_handlerGet(t *testing.T) {
 	}{
 		{
 			name:    "get original link correct",
-			request: "/",
+			request: "/{id}",
 			id:      "-8eOIgoJ",
 			urlStore: map[string]string{
 				"-8eOIgoJ": "https://rcimbvs.com/iuymedy",
@@ -106,9 +108,13 @@ func Test_handlerGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			path := tt.request + tt.id
-			request := httptest.NewRequest(http.MethodGet, path, nil)
-			request.SetPathValue("id", tt.id)
+			//path := tt.request + tt.id
+			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("id", tt.id)
+
+			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
+			//request.SetPathValue("id", tt.id)
 			w := httptest.NewRecorder()
 			h := handlerGet(tt.urlStore)
 			h(w, request)

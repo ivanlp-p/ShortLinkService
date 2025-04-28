@@ -46,7 +46,7 @@ func handler() http.HandlerFunc {
 		urlStore[shortID] = originalURL
 		mu.Unlock()
 
-		shortURL := fmt.Sprintf("%s", shortID)
+		shortURL := fmt.Sprintf("http://localhost:8080/%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
@@ -86,13 +86,4 @@ func main() {
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", r))
-	//mux := http.NewServeMux()
-	//mux.HandleFunc("/", handler())
-	//mux.HandleFunc("/{id}", handlerGet(urlStore))
-	//
-	//fmt.Println("Server is running on http://localhost:8080")
-	//err := http.ListenAndServe(":8080", mux)
-	//if err != nil {
-	//	panic(err)
-	//}
 }
