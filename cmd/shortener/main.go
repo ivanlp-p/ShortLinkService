@@ -22,13 +22,9 @@ var (
 )
 
 func init() {
-	flag.StringVar(&address, "a", "localhost:8080", "Address to launch the HTTP server")
+	flag.StringVar(&address, "a", ":8080", "Address to launch the HTTP server")
 	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for shortened links")
-	flag.Parse()
 
-	if !strings.HasSuffix(baseURL, "/") {
-		baseURL += "/"
-	}
 }
 
 func shortenURL(url string) string {
@@ -93,6 +89,12 @@ func handlerGet(urlStore map[string]string) http.HandlerFunc {
 }
 
 func main() {
+	flag.Parse()
+
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
+
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post("/", handler())
