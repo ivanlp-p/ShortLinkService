@@ -74,17 +74,17 @@ func handlerGet(urlStore map[string]string) http.HandlerFunc {
 		}
 
 		id := chi.URLParam(r, "id")
-		originalUrl := urlStore[id]
+		originalURL := urlStore[id]
 
 		_, err := io.ReadAll(r.Body)
-		if err != nil || originalUrl == "" {
+		if err != nil || originalURL == "" {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
 
-		fmt.Println("originalUrl: ", originalUrl)
+		fmt.Println("originalURL: ", originalURL)
 
-		w.Header().Set("Location", originalUrl)
+		w.Header().Set("Location", originalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }
@@ -95,8 +95,8 @@ func main() {
 	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
 		address = envRunHostAddr
 	}
-	if envRunBaseUrl := os.Getenv("BASE_URL"); envRunBaseUrl != "" {
-		baseURL = envRunBaseUrl
+	if envRunBaseURL := os.Getenv("BASE_URL"); envRunBaseURL != "" {
+		baseURL = envRunBaseURL
 	}
 
 	if !strings.HasSuffix(baseURL, "/") {
