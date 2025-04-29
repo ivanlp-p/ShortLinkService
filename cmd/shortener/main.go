@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 )
@@ -93,6 +94,13 @@ func main() {
 
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL += "/"
+	}
+
+	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
+		address = envRunHostAddr
+	}
+	if envRunBaseUrl := os.Getenv("BASE_URL"); envRunBaseUrl != "" {
+		baseURL = envRunBaseUrl
 	}
 
 	r := chi.NewRouter()
