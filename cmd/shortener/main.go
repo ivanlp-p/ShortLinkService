@@ -92,15 +92,15 @@ func handlerGet(urlStore map[string]string) http.HandlerFunc {
 func main() {
 	flag.Parse()
 
-	if !strings.HasSuffix(baseURL, "/") {
-		baseURL += "/"
-	}
-
 	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
 		address = envRunHostAddr
 	}
 	if envRunBaseUrl := os.Getenv("BASE_URL"); envRunBaseUrl != "" {
 		baseURL = envRunBaseUrl
+	}
+
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
 	}
 
 	r := chi.NewRouter()
