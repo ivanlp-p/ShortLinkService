@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha1"
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -15,7 +16,20 @@ import (
 var (
 	urlStore = make(map[string]string)
 	mu       sync.Mutex
+
+	address string
+	baseURL string
 )
+
+func init() {
+	flag.StringVar(&address, "a", "localhost:8080", "Address to launch the HTTP server")
+	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for shortened links")
+	flag.Parse()
+
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
+}
 
 func shortenURL(url string) string {
 	h := sha1.New()
@@ -46,7 +60,7 @@ func handler() http.HandlerFunc {
 		urlStore[shortID] = originalURL
 		mu.Unlock()
 
-		shortURL := fmt.Sprintf("http://localhost:8080/%s", shortID)
+		shortURL := fmt.Sprintf(address+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
@@ -85,5 +99,5 @@ func main() {
 		r.Get("/{id}", handlerGet(urlStore))
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(address, r))
 }
