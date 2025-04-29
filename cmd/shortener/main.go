@@ -60,7 +60,7 @@ func handler() http.HandlerFunc {
 		urlStore[shortID] = originalURL
 		mu.Unlock()
 
-		shortURL := fmt.Sprintf(address+"%s", shortID)
+		shortURL := fmt.Sprintf(baseURL+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
