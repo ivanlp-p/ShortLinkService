@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
 
+const endpoint = "http://localhost:8080/"
+
 func main() {
-	endpoint := "http://localhost:8080/"
 	// контейнер данных для запроса
 	data := url.Values{}
 	// приглашение в консоли
@@ -21,7 +23,7 @@ func main() {
 	// читаем строку из консоли
 	long, err := reader.ReadString('\n')
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	long = strings.TrimSuffix(long, "\n")
 	// заполняем контейнер данными

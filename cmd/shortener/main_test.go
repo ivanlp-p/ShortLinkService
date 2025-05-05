@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"github.com/go-chi/chi/v5"
+	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -13,6 +15,9 @@ import (
 )
 
 func Test_handler(t *testing.T) {
+	config.BaseURL = "http://localhost:8080/"
+	store := storage.NewMapStorage()
+
 	type want struct {
 		contentType string
 		statusCode  int
@@ -25,7 +30,7 @@ func Test_handler(t *testing.T) {
 		want    want
 	}{
 		{
-			name:    "create short link correct",
+			name:    "create_short_link_correct",
 			request: "/",
 			body:    "https://rcimbvs.com/iuymedy",
 			want: want{
@@ -35,7 +40,7 @@ func Test_handler(t *testing.T) {
 			},
 		},
 		{
-			name:    "body is empty",
+			name:    "body_is_empty",
 			request: "/",
 			body:    "",
 			want: want{
@@ -49,24 +54,44 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler()
+			h := handler(store)
 			h(w, request)
 
 			result := w.Result()
 
-			assert.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.statusCode, result.StatusCode)
+			actualHeaderContentType := result.Header.Get("Content-Type")
+
+			if actualHeaderContentType == "" || actualHeaderContentType != tt.want.contentType {
+				t.Errorf("Actual Header Content-Type = %v, required Header Content-Type = %v",
+					actualHeaderContentType, tt.want.contentType)
+			}
+
+			actualStatusCode := result.StatusCode
+
+			if actualStatusCode != tt.want.statusCode {
+				t.Errorf("Actual status code = %v, required Status code = %v",
+					actualStatusCode, tt.want.statusCode)
+			}
 
 			body, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 			err = result.Body.Close()
 			require.NoError(t, err)
-			assert.Equal(t, tt.want.body, string(body))
+
+			actualResponseBody := string(body)
+
+			if actualResponseBody == "" || actualResponseBody != tt.want.body {
+				t.Errorf("Actual response body = %v, required response body = %v",
+					actualResponseBody, tt.want.body)
+			}
 		})
 	}
 }
 
 func Test_handlerGet(t *testing.T) {
+	store := storage.NewMapStorage()
+	store.Set("-8eOIgoJ", "https://rcimbvs.com/iuymedy")
+
 	type want struct {
 		location   string
 		statusCode int
@@ -80,7 +105,7 @@ func Test_handlerGet(t *testing.T) {
 		want     want
 	}{
 		{
-			name:    "get original link correct",
+			name:    "get_original_link_correct",
 			request: "/{id}",
 			id:      "-8eOIgoJ",
 			urlStore: map[string]string{
@@ -93,7 +118,7 @@ func Test_handlerGet(t *testing.T) {
 			},
 		},
 		{
-			name:    "wrong short id",
+			name:    "wrong_short_id",
 			request: "/",
 			id:      "-8eOIg",
 			urlStore: map[string]string{
@@ -101,22 +126,21 @@ func Test_handlerGet(t *testing.T) {
 			},
 			want: want{
 				location:   "",
-				statusCode: 400,
-				body:       "Bad Request\n",
+				statusCode: 404,
+				body:       "Not Found\n",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//path := tt.request + tt.id
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
 			rctx := chi.NewRouteContext()
 			rctx.URLParams.Add("id", tt.id)
 
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
-			//request.SetPathValue("id", tt.id)
+
 			w := httptest.NewRecorder()
-			h := handlerGet(tt.urlStore)
+			h := handlerGet(store)
 			h(w, request)
 
 			result := w.Result()
@@ -125,8 +149,8 @@ func Test_handlerGet(t *testing.T) {
 			if err != nil {
 				return
 			}
-			assert.Equal(t, tt.want.statusCode, result.StatusCode)
-			assert.Equal(t, tt.want.location, result.Header.Get("Location"))
+			assert.Equal(t, tt.want.statusCode, result.StatusCode, "In actual result status code not equals required")
+			assert.Equal(t, tt.want.location, result.Header.Get("Location"), "Location not correct")
 		})
 	}
 }

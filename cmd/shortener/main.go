@@ -1,44 +1,18 @@
 package main
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
-	"flag"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/storage"
+	"github.com/ivanlp-p/ShortLinkService/internal/utils"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
-	"sync"
 )
 
-var (
-	urlStore = make(map[string]string)
-	mu       sync.Mutex
-
-	address string
-	baseURL string
-)
-
-func init() {
-	flag.StringVar(&address, "a", ":8080", "Address to launch the HTTP server")
-	flag.StringVar(&baseURL, "b", "http://localhost:8080/", "Base URL for shortened links")
-
-}
-
-func shortenURL(url string) string {
-	h := sha1.New()
-	h.Write([]byte(url))
-	bs := h.Sum(nil)
-	encoded := base64.URLEncoding.EncodeToString(bs)
-	// Используем первые 8 символов для короткого URL
-	short := encoded[:8]
-	return short
-}
-
-func handler() http.HandlerFunc {
+func handler(store *storage.MapStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/" {
 			http.Error(w, "Not Found", http.StatusNotFound)
@@ -51,13 +25,11 @@ func handler() http.HandlerFunc {
 			return
 		}
 		originalURL := strings.TrimSpace(string(body))
-		shortID := shortenURL(originalURL)
+		shortID := utils.ShortenURL(originalURL)
 
-		mu.Lock()
-		urlStore[shortID] = originalURL
-		mu.Unlock()
+		store.Set(shortID, originalURL)
 
-		shortURL := fmt.Sprintf(baseURL+"%s", shortID)
+		shortURL := fmt.Sprintf(config.BaseURL+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
@@ -65,16 +37,22 @@ func handler() http.HandlerFunc {
 	}
 }
 
-func handlerGet(urlStore map[string]string) http.HandlerFunc {
+func handlerGet(store *storage.MapStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("ID: ", chi.URLParam(r, "id"))
 		if r.Method != http.MethodGet {
-			http.Error(w, "Not Found", http.StatusNotFound)
+			http.Error(w, "Bad Request", http.StatusMethodNotAllowed)
 			return
 		}
 
 		id := chi.URLParam(r, "id")
-		originalURL := urlStore[id]
+
+		originalURL, ok := store.Get(id)
+
+		if !ok {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
 
 		_, err := io.ReadAll(r.Body)
 		if err != nil || originalURL == "" {
@@ -90,24 +68,15 @@ func handlerGet(urlStore map[string]string) http.HandlerFunc {
 }
 
 func main() {
-	flag.Parse()
+	config.Init()
 
-	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
-		address = envRunHostAddr
-	}
-	if envRunBaseURL := os.Getenv("BASE_URL"); envRunBaseURL != "" {
-		baseURL = envRunBaseURL
-	}
-
-	if !strings.HasSuffix(baseURL, "/") {
-		baseURL += "/"
-	}
+	store := storage.NewMapStorage()
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", handler())
-		r.Get("/{id}", handlerGet(urlStore))
+		r.Post("/", handler(store))
+		r.Get("/{id}", handlerGet(store))
 	})
 
-	log.Fatal(http.ListenAndServe(address, r))
+	log.Fatal(http.ListenAndServe(config.Address, r))
 }
