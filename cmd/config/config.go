@@ -11,9 +11,9 @@ const (
 	defaultPort   = ":8080"
 	hostFlagUsage = "Address to launch the HTTP server"
 
-	baseUrlFlagName  = "b"
+	baseURLFlagName  = "b"
 	defaultEndpoint  = "http://localhost:8080/"
-	baseUrlFlagUsage = "Base URL for shortened links"
+	baseURLFlagUsage = "Base URL for shortened links"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 
 func Init() {
 	flag.StringVar(&Address, hostFlagName, defaultPort, hostFlagUsage)
-	flag.StringVar(&BaseURL, baseUrlFlagName, defaultEndpoint, baseUrlFlagUsage)
+	flag.StringVar(&BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
 
 	flag.Parse()
 
