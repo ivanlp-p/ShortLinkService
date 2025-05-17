@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/logger"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
+	"go.uber.org/zap"
 	"io"
 	"log"
 	"net/http"
@@ -70,13 +72,23 @@ func handlerGet(store *storage.MapStorage) http.HandlerFunc {
 func main() {
 	config.Init()
 
+	run()
+
 	store := storage.NewMapStorage()
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", handler(store))
+		r.Post("/", logger.RequestLogger(handler(store)))
 		r.Get("/{id}", handlerGet(store))
 	})
 
 	log.Fatal(http.ListenAndServe(config.Address, r))
+}
+
+func run() {
+	if err := logger.Initialize(config.LogLevel); err != nil {
+		logger.Log.Error(err.Error())
+	}
+
+	logger.Log.Info("Running server on", zap.String("Address", config.Address))
 }
