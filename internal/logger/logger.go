@@ -3,6 +3,7 @@ package logger
 import (
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -74,13 +75,9 @@ func RequestLogger(h http.Handler) http.HandlerFunc {
 			zap.String("uri", r.RequestURI),
 			zap.String("method", r.Method),
 			zap.String("duration", duration.String()),
+			zap.String("status", strconv.Itoa(responseData.status)),
+			zap.String("size", strconv.Itoa(responseData.size)),
 		)
 	}
 	return logFunc
-}
-
-func ResponseLogger(h http.HandlerFunc) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-	})
 }
