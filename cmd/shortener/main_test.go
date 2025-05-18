@@ -154,3 +154,93 @@ func Test_handlerGet(t *testing.T) {
 		})
 	}
 }
+
+func Test_PostShortenRequest(t *testing.T) {
+	config.BaseURL = "http://localhost:8080/"
+	store := storage.NewMapStorage()
+	request := "/api/shorten/"
+
+	successBody := `{
+   "url": "http://localhost:8080/7CwAhsKq"
+}`
+
+	testCases := []struct {
+		name         string // добавляем название тестов
+		method       string
+		body         string // добавляем тело запроса в табличные тесты
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "method_get",
+			method:       http.MethodGet,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_put",
+			method:       http.MethodPut,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_delete",
+			method:       http.MethodDelete,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_without_body",
+			method:       http.MethodPost,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_success",
+			method:       http.MethodPost,
+			body:         `{"url": "https://practicum.yandex.ru"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: successBody,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.method, func(t *testing.T) {
+			request := httptest.NewRequest(tc.method, request, bytes.NewBufferString(tc.body))
+			w := httptest.NewRecorder()
+			h := PostShortenRequest(store)
+			h(w, request)
+
+			result := w.Result()
+
+			//actualHeaderContentType := result.Header.Get("Content-Type")
+			//
+			//if actualHeaderContentType == "" || actualHeaderContentType != tt.want.contentType {
+			//	t.Errorf("Actual Header Content-Type = %v, required Header Content-Type = %v",
+			//		actualHeaderContentType, tt.want.contentType)
+			//}
+
+			actualStatusCode := result.StatusCode
+
+			if actualStatusCode != tc.expectedCode {
+				t.Errorf("Actual status code = %v, required Status code = %v",
+					actualStatusCode, tc.expectedCode)
+			}
+
+			body, err := io.ReadAll(result.Body)
+			require.NoError(t, err)
+			err = result.Body.Close()
+			require.NoError(t, err)
+
+			if tc.expectedBody != "" {
+				actualResponseBody := string(body)
+
+				if actualResponseBody != tc.expectedBody {
+					t.Errorf("Actual response body = %v, required response body = %v",
+						actualResponseBody, tc.expectedBody)
+				}
+			}
+		})
+	}
+
+}
