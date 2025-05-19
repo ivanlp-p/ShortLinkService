@@ -161,7 +161,7 @@ func Test_PostShortenRequest(t *testing.T) {
 	request := "/api/shorten/"
 
 	successBody := `{
-   "url": "http://localhost:8080/7CwAhsKq"
+   "result": "http://localhost:8080/7CwAhsKq"
 }`
 
 	testCases := []struct {
@@ -212,13 +212,6 @@ func Test_PostShortenRequest(t *testing.T) {
 			h(w, request)
 
 			result := w.Result()
-
-			//actualHeaderContentType := result.Header.Get("Content-Type")
-			//
-			//if actualHeaderContentType == "" || actualHeaderContentType != tt.want.contentType {
-			//	t.Errorf("Actual Header Content-Type = %v, required Header Content-Type = %v",
-			//		actualHeaderContentType, tt.want.contentType)
-			//}
 
 			actualStatusCode := result.StatusCode
 
