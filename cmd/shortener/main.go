@@ -91,7 +91,7 @@ func PostShortenRequest(store *storage.MapStorage) http.HandlerFunc {
 		shortURL := config.BaseURL + shortID
 
 		resp := models.ShortURL{
-			URL: shortURL,
+			Result: shortURL,
 		}
 
 		response, err := json.MarshalIndent(resp, "", "   ")
@@ -118,7 +118,7 @@ func main() {
 		r.Post("/", logger.RequestLogger(handler(store)))
 		r.Get("/{id}", logger.RequestLogger(handlerGet(store)))
 		r.Route("/api/", func(r chi.Router) {
-			r.Post("/shorten/", logger.RequestLogger(PostShortenRequest(store)))
+			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(store)))
 		})
 	})
 
