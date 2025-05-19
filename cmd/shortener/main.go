@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/compress"
 	"github.com/ivanlp-p/ShortLinkService/internal/logger"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
@@ -115,8 +116,8 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", logger.RequestLogger(handler(store)))
-		r.Get("/{id}", logger.RequestLogger(handlerGet(store)))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(store))))
+		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(store))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(store)))
 		})
