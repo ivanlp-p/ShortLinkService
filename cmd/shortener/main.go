@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
 	"github.com/ivanlp-p/ShortLinkService/internal/compress"
 	"github.com/ivanlp-p/ShortLinkService/internal/logger"
@@ -17,7 +18,7 @@ import (
 	"strings"
 )
 
-func handler(store *storage.MapStorage) http.HandlerFunc {
+func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/" {
 			http.Error(w, "Not Found", http.StatusNotFound)
@@ -31,8 +32,15 @@ func handler(store *storage.MapStorage) http.HandlerFunc {
 		}
 		originalURL := strings.TrimSpace(string(body))
 		shortID := utils.ShortenURL(originalURL)
+		shortLink := models.ShortLink{UUID: uuid.NewString(),
+			ShortURL:    shortID,
+			OriginalURL: originalURL,
+		}
 
-		store.Set(shortID, originalURL)
+		fileStorage.SaveShortLink(shortLink)
+		if err != nil {
+			logger.Log.Error("FileStorage not available")
+		}
 
 		shortURL := fmt.Sprintf(config.BaseURL+"%s", shortID)
 
@@ -72,7 +80,7 @@ func handlerGet(store *storage.MapStorage) http.HandlerFunc {
 	}
 }
 
-func PostShortenRequest(store *storage.MapStorage) http.HandlerFunc {
+func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var originURL models.OriginalURL
 
@@ -88,7 +96,12 @@ func PostShortenRequest(store *storage.MapStorage) http.HandlerFunc {
 
 		url := originURL.URL
 		shortID := utils.ShortenURL(url)
-		store.Set(shortID, url)
+		shortLink := models.ShortLink{UUID: uuid.NewString(),
+			ShortURL:    shortID,
+			OriginalURL: url,
+		}
+
+		fileStorage.SaveShortLink(shortLink)
 		shortURL := config.BaseURL + shortID
 
 		resp := models.ShortURL{
@@ -113,13 +126,19 @@ func main() {
 	run()
 
 	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage(config.FileStorage, store)
+
+	err := fileStorage.LoadFromFile()
+	if err != nil {
+		logger.Log.Error("Store not load")
+	}
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(store))))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(fileStorage))))
 		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(store))))
 		r.Route("/api/", func(r chi.Router) {
-			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(store)))
+			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(fileStorage)))
 		})
 	})
 

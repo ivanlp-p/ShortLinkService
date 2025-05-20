@@ -17,6 +17,7 @@ import (
 func Test_handler(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage("data.txt", store)
 
 	type want struct {
 		contentType string
@@ -54,7 +55,7 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(store)
+			h := handler(fileStorage)
 			h(w, request)
 
 			result := w.Result()
@@ -158,6 +159,7 @@ func Test_handlerGet(t *testing.T) {
 func Test_PostShortenRequest(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage("data.txt", store)
 	request := "/api/shorten/"
 
 	successBody := `{
@@ -208,7 +210,7 @@ func Test_PostShortenRequest(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			request := httptest.NewRequest(tc.method, request, bytes.NewBufferString(tc.body))
 			w := httptest.NewRecorder()
-			h := PostShortenRequest(store)
+			h := PostShortenRequest(fileStorage)
 			h(w, request)
 
 			result := w.Result()

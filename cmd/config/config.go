@@ -18,18 +18,24 @@ const (
 	logLevelFlagName  = "l"
 	defaultLogLevel   = "info"
 	logLevelFlagUsage = "Log level"
+
+	fileStorageFlagName    = "f"
+	defaultFileStoragePath = "short_link_storage.txt"
+	fileStorageFlagUsage
 )
 
 var (
-	Address  string
-	BaseURL  string
-	LogLevel string
+	Address     string
+	BaseURL     string
+	LogLevel    string
+	FileStorage string
 )
 
 func Init() {
 	flag.StringVar(&Address, hostFlagName, defaultPort, hostFlagUsage)
 	flag.StringVar(&BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
 	flag.StringVar(&LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
+	flag.StringVar(&FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
 
 	flag.Parse()
 
@@ -41,6 +47,9 @@ func Init() {
 	}
 	if envRunLogLevel := os.Getenv("LOG_LEVEL"); envRunLogLevel != "" {
 		LogLevel = envRunLogLevel
+	}
+	if envRunFileStorage := os.Getenv("FILE_STORAGE_PATH"); envRunFileStorage != "" {
+		FileStorage = envRunFileStorage
 	}
 
 	// Убедиться, что baseURL заканчивается на /
