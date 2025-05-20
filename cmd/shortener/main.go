@@ -38,9 +38,6 @@ func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 		}
 
 		fileStorage.SaveShortLink(shortLink)
-		if err != nil {
-			logger.Log.Error("FileStorage not available")
-		}
 
 		shortURL := fmt.Sprintf(config.BaseURL+"%s", shortID)
 
