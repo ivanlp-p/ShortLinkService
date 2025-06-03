@@ -20,11 +20,6 @@ import (
 
 func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/" {
-			http.Error(w, "Not Found", http.StatusNotFound)
-			return
-		}
-
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -47,24 +42,20 @@ func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 	}
 }
 
-func handlerGet(store *storage.MapStorage) http.HandlerFunc {
+func handlerGet(fileStorage *storage.FileStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("ID: ", chi.URLParam(r, "id"))
-		if r.Method != http.MethodGet {
-			http.Error(w, "Bad Request", http.StatusMethodNotAllowed)
-			return
-		}
 
 		id := chi.URLParam(r, "id")
 
-		originalURL, ok := store.Get(id)
+		originalURL, err := fileStorage.GetOriginalURL(id)
 
-		if !ok {
+		if err != nil {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
 
-		_, err := io.ReadAll(r.Body)
+		_, err = io.ReadAll(r.Body)
 		if err != nil || originalURL == "" {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
@@ -120,7 +111,9 @@ func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
 func main() {
 	config.Init()
 
-	run()
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 
 	store := storage.NewMapStorage()
 	fileStorage := storage.NewFileStorage(config.FileStorage, store)
@@ -133,7 +126,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(fileStorage))))
-		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(store))))
+		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(fileStorage))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(fileStorage)))
 		})
@@ -142,10 +135,10 @@ func main() {
 	log.Fatal(http.ListenAndServe(config.Address, r))
 }
 
-func run() {
+func run() error {
 	if err := logger.Initialize(config.LogLevel); err != nil {
-		logger.Log.Error(err.Error())
+		return err
 	}
-
 	logger.Log.Info("Running server on", zap.String("Address", config.Address))
+	return nil
 }

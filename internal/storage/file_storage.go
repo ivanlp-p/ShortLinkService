@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"os"
 	"sync"
@@ -22,6 +23,9 @@ func NewFileStorage(fileName string, store *MapStorage) *FileStorage {
 }
 
 func (fs *FileStorage) LoadFromFile() error {
+	fs.mx.Lock()
+	defer fs.mx.Unlock()
+
 	file, err := os.Open(fs.fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -40,6 +44,15 @@ func (fs *FileStorage) LoadFromFile() error {
 		fs.store.Set(record.ShortURL, record.OriginalURL)
 	}
 	return scanner.Err()
+}
+
+func (fs *FileStorage) GetOriginalURL(id string) (string, error) {
+	originalURL, ok := fs.store.Get(id)
+	if !ok {
+		return "", errors.New("original URL not found")
+	}
+
+	return originalURL, nil
 }
 
 func (fs *FileStorage) SaveShortLink(shortLink models.ShortLink) error {

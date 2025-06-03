@@ -17,7 +17,7 @@ import (
 func Test_handler(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
-	fileStorage := storage.NewFileStorage("data.txt", store)
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
 		contentType string
@@ -92,6 +92,7 @@ func Test_handler(t *testing.T) {
 func Test_handlerGet(t *testing.T) {
 	store := storage.NewMapStorage()
 	store.Set("-8eOIgoJ", "https://rcimbvs.com/iuymedy")
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
 		location   string
@@ -141,7 +142,7 @@ func Test_handlerGet(t *testing.T) {
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
 
 			w := httptest.NewRecorder()
-			h := handlerGet(store)
+			h := handlerGet(fileStorage)
 			h(w, request)
 
 			result := w.Result()
@@ -159,7 +160,7 @@ func Test_handlerGet(t *testing.T) {
 func Test_PostShortenRequest(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
-	fileStorage := storage.NewFileStorage("data.txt", store)
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 	request := "/api/shorten/"
 
 	successBody := `{
