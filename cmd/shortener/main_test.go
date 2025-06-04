@@ -17,6 +17,7 @@ import (
 func Test_handler(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
 		contentType string
@@ -54,7 +55,7 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(store)
+			h := handler(fileStorage)
 			h(w, request)
 
 			result := w.Result()
@@ -91,6 +92,7 @@ func Test_handler(t *testing.T) {
 func Test_handlerGet(t *testing.T) {
 	store := storage.NewMapStorage()
 	store.Set("-8eOIgoJ", "https://rcimbvs.com/iuymedy")
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
 		location   string
@@ -140,7 +142,7 @@ func Test_handlerGet(t *testing.T) {
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
 
 			w := httptest.NewRecorder()
-			h := handlerGet(store)
+			h := handlerGet(fileStorage)
 			h(w, request)
 
 			result := w.Result()
@@ -153,4 +155,88 @@ func Test_handlerGet(t *testing.T) {
 			assert.Equal(t, tt.want.location, result.Header.Get("Location"), "Location not correct")
 		})
 	}
+}
+
+func Test_PostShortenRequest(t *testing.T) {
+	config.BaseURL = "http://localhost:8080/"
+	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
+	request := "/api/shorten/"
+
+	successBody := `{
+   "result": "http://localhost:8080/7CwAhsKq"
+}`
+
+	testCases := []struct {
+		name         string // добавляем название тестов
+		method       string
+		body         string // добавляем тело запроса в табличные тесты
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "method_get",
+			method:       http.MethodGet,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_put",
+			method:       http.MethodPut,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_delete",
+			method:       http.MethodDelete,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_without_body",
+			method:       http.MethodPost,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_success",
+			method:       http.MethodPost,
+			body:         `{"url": "https://practicum.yandex.ru"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: successBody,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.method, func(t *testing.T) {
+			request := httptest.NewRequest(tc.method, request, bytes.NewBufferString(tc.body))
+			w := httptest.NewRecorder()
+			h := PostShortenRequest(fileStorage)
+			h(w, request)
+
+			result := w.Result()
+
+			actualStatusCode := result.StatusCode
+
+			if actualStatusCode != tc.expectedCode {
+				t.Errorf("Actual status code = %v, required Status code = %v",
+					actualStatusCode, tc.expectedCode)
+			}
+
+			body, err := io.ReadAll(result.Body)
+			require.NoError(t, err)
+			err = result.Body.Close()
+			require.NoError(t, err)
+
+			if tc.expectedBody != "" {
+				actualResponseBody := string(body)
+
+				if actualResponseBody != tc.expectedBody {
+					t.Errorf("Actual response body = %v, required response body = %v",
+						actualResponseBody, tc.expectedBody)
+				}
+			}
+		})
+	}
+
 }
