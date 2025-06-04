@@ -17,6 +17,7 @@ import (
 func Test_handler(t *testing.T) {
 	config.BaseURL = "http://localhost:8080/"
 	store := storage.NewMapStorage()
+	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
 		contentType string
@@ -54,7 +55,7 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(store)
+			h := handler(fileStorage)
 			h(w, request)
 
 			result := w.Result()
