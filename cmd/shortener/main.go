@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
+func handler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
@@ -27,12 +27,8 @@ func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 		}
 		originalURL := strings.TrimSpace(string(body))
 		shortID := utils.ShortenURL(originalURL)
-		shortLink := models.ShortLink{UUID: uuid.NewString(),
-			ShortURL:    shortID,
-			OriginalURL: originalURL,
-		}
 
-		fileStorage.SaveShortLink(shortLink)
+		storage.Set(shortID, originalURL)
 
 		shortURL := fmt.Sprintf(config.BaseURL+"%s", shortID)
 
@@ -125,7 +121,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(fileStorage))))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(store))))
 		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(fileStorage))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(fileStorage)))
