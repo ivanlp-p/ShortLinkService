@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -11,6 +12,7 @@ import (
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -108,6 +110,17 @@ func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
 	}
 }
 
+func HandlerPing(conn *pgx.Conn) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := conn.Ping(context.Background())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func main() {
 	config.Init()
 
@@ -123,6 +136,12 @@ func main() {
 		logger.Log.Error("Store not load")
 	}
 
+	conn, err := pgx.Connect(context.Background(), config.DB)
+	if err != nil {
+		logger.Log.Error("Database not initialize")
+	}
+	defer conn.Close(context.Background())
+
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(fileStorage))))
@@ -130,6 +149,7 @@ func main() {
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(fileStorage)))
 		})
+		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(conn))))
 	})
 
 	log.Fatal(http.ListenAndServe(config.Address, r))
