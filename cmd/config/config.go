@@ -22,6 +22,10 @@ const (
 	fileStorageFlagName    = "f"
 	defaultFileStoragePath = "/tmp/short-url-db.json"
 	fileStorageFlagUsage
+
+	databaseFlagName    = "d"
+	defaultDatabasePath = "host=localhost user=postgres password=GfdGjc964 dbname=postgres sslmode=disable"
+	databaseFlagUsage   = "Database path"
 )
 
 var (
@@ -29,6 +33,7 @@ var (
 	BaseURL     string
 	LogLevel    string
 	FileStorage string
+	DB          string
 )
 
 func Init() {
@@ -36,6 +41,7 @@ func Init() {
 	flag.StringVar(&BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
 	flag.StringVar(&LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
 	flag.StringVar(&FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
+	flag.StringVar(&DB, databaseFlagName, defaultDatabasePath, databaseFlagUsage)
 
 	flag.Parse()
 
@@ -50,6 +56,9 @@ func Init() {
 	}
 	if envRunFileStorage := os.Getenv("FILE_STORAGE_PATH"); envRunFileStorage != "" {
 		FileStorage = envRunFileStorage
+	}
+	if envRunDatabase := os.Getenv("DATABASE_DSN"); envRunDatabase != "" {
+		DB = envRunDatabase
 	}
 
 	// Убедиться, что baseURL заканчивается на /
