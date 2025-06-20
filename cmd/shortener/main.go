@@ -12,7 +12,6 @@ import (
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
-	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -20,7 +19,9 @@ import (
 	"strings"
 )
 
-func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
+var cfg config.Config
+
+func handler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
@@ -29,14 +30,15 @@ func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 		}
 		originalURL := strings.TrimSpace(string(body))
 		shortID := utils.ShortenURL(originalURL)
-		shortLink := models.ShortLink{UUID: uuid.NewString(),
+		shortLink := models.ShortLink{
+			UUID:        uuid.NewString(),
 			ShortURL:    shortID,
 			OriginalURL: originalURL,
 		}
 
-		fileStorage.SaveShortLink(shortLink)
+		storage.PutOriginalURL(context.Background(), shortLink)
 
-		shortURL := fmt.Sprintf(config.BaseURL+"%s", shortID)
+		shortURL := fmt.Sprintf(cfg.BaseURL+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
@@ -44,13 +46,13 @@ func handler(fileStorage *storage.FileStorage) http.HandlerFunc {
 	}
 }
 
-func handlerGet(fileStorage *storage.FileStorage) http.HandlerFunc {
+func handlerGet(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("ID: ", chi.URLParam(r, "id"))
 
 		id := chi.URLParam(r, "id")
 
-		originalURL, err := fileStorage.GetOriginalURL(id)
+		originalURL, err := storage.GetOriginalURL(context.Background(), id)
 
 		if err != nil {
 			http.Error(w, "Not Found", http.StatusNotFound)
@@ -70,7 +72,7 @@ func handlerGet(fileStorage *storage.FileStorage) http.HandlerFunc {
 	}
 }
 
-func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
+func PostShortenRequest(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var originURL models.OriginalURL
 
@@ -91,8 +93,8 @@ func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
 			OriginalURL: url,
 		}
 
-		fileStorage.SaveShortLink(shortLink)
-		shortURL := config.BaseURL + shortID
+		storage.PutOriginalURL(context.Background(), shortLink)
+		shortURL := cfg.BaseURL + shortID
 
 		resp := models.ShortURL{
 			Result: shortURL,
@@ -110,9 +112,9 @@ func PostShortenRequest(fileStorage *storage.FileStorage) http.HandlerFunc {
 	}
 }
 
-func HandlerPing(conn *pgx.Conn) http.HandlerFunc {
+func HandlerPing(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := conn.Ping(context.Background())
+		err := storage.Ping(context.Background())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -122,43 +124,67 @@ func HandlerPing(conn *pgx.Conn) http.HandlerFunc {
 }
 
 func main() {
-	config.Init()
+	cfg := config.Init()
 
-	if err := run(); err != nil {
+	if err := initLogger(cfg.LogLevel); err != nil {
 		log.Fatal(err)
 	}
 
-	store := storage.NewMapStorage()
-	fileStorage := storage.NewFileStorage(config.FileStorage, store)
+	logger.Log.Info("Running server on", zap.String("Address", cfg.Address))
 
-	err := fileStorage.LoadFromFile()
-	if err != nil {
-		logger.Log.Error("Store not load")
-	}
-
-	conn, err := pgx.Connect(context.Background(), config.DB)
-	if err != nil {
-		logger.Log.Error("Database not initialize")
-	}
-	defer conn.Close(context.Background())
+	strg := initStorage(cfg)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(fileStorage))))
-		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(fileStorage))))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg))))
+		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
 		r.Route("/api/", func(r chi.Router) {
-			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(fileStorage)))
+			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg)))
 		})
-		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(conn))))
+		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))
 	})
 
-	log.Fatal(http.ListenAndServe(config.Address, r))
+	log.Fatal(http.ListenAndServe(cfg.Address, r))
 }
 
-func run() error {
-	if err := logger.Initialize(config.LogLevel); err != nil {
+func initStorage(cfg config.Config) storage.Storage {
+	var strg storage.Storage
+	var err error
+
+	store := storage.NewMapStorage()
+
+	if cfg.DB != "" {
+		strg, err = storage.NewPostgresStorage(context.Background(), cfg.DB)
+		if err != nil {
+			logger.Log.Error("Failed to initialize PostgreSQL storage: %v. Falling back to file storage", zap.Error(err))
+		}
+	}
+
+	if strg == nil && cfg.FileStorage != "" {
+		strg = storage.NewFileStorage(cfg.FileStorage, store)
+		err := strg.LoadFromFile()
+		if err != nil {
+			logger.Log.Error("Store not load")
+		}
+	}
+
+	if strg == nil {
+		strg = store
+	}
+
+	//conn, err := pgx.Connect(context.Background(), cfg.DB)
+	//if err != nil {
+	//	logger.Log.Error("Database not initialize")
+	//}
+	//defer conn.Close(context.Background())
+
+	return strg
+}
+
+func initLogger(logLevel string) error {
+	if err := logger.Initialize(logLevel); err != nil {
 		return err
 	}
-	logger.Log.Info("Running server on", zap.String("Address", config.Address))
+
 	return nil
 }

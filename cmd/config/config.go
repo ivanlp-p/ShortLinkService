@@ -24,46 +24,49 @@ const (
 	fileStorageFlagUsage
 
 	databaseFlagName    = "d"
-	defaultDatabasePath = "host=localhost user=postgres password=GfdGjc964 dbname=postgres sslmode=disable"
+	defaultDatabasePath = "postgres://postgres:GfdGjc964@localhost:5432/videos"
 	databaseFlagUsage   = "Database path"
 )
 
-var (
+type Config struct {
 	Address     string
 	BaseURL     string
 	LogLevel    string
 	FileStorage string
 	DB          string
-)
+}
 
-func Init() {
-	flag.StringVar(&Address, hostFlagName, defaultPort, hostFlagUsage)
-	flag.StringVar(&BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
-	flag.StringVar(&LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
-	flag.StringVar(&FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
-	flag.StringVar(&DB, databaseFlagName, defaultDatabasePath, databaseFlagUsage)
+func Init() Config {
+	var cfg Config
+
+	flag.StringVar(&cfg.Address, hostFlagName, defaultPort, hostFlagUsage)
+	flag.StringVar(&cfg.BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
+	flag.StringVar(&cfg.LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
+	flag.StringVar(&cfg.FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
+	flag.StringVar(&cfg.DB, databaseFlagName, defaultDatabasePath, databaseFlagUsage)
 
 	flag.Parse()
 
 	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
-		Address = envRunHostAddr
+		cfg.Address = envRunHostAddr
 	}
 	if envRunBaseURL := os.Getenv("BASE_URL"); envRunBaseURL != "" {
-		BaseURL = envRunBaseURL
+		cfg.BaseURL = envRunBaseURL
 	}
 	if envRunLogLevel := os.Getenv("LOG_LEVEL"); envRunLogLevel != "" {
-		LogLevel = envRunLogLevel
+		cfg.LogLevel = envRunLogLevel
 	}
 	if envRunFileStorage := os.Getenv("FILE_STORAGE_PATH"); envRunFileStorage != "" {
-		FileStorage = envRunFileStorage
+		cfg.FileStorage = envRunFileStorage
 	}
 	if envRunDatabase := os.Getenv("DATABASE_DSN"); envRunDatabase != "" {
-		DB = envRunDatabase
+		cfg.DB = envRunDatabase
 	}
 
 	// Убедиться, что baseURL заканчивается на /
-	if !strings.HasSuffix(BaseURL, "/") {
-		BaseURL += "/"
+	if !strings.HasSuffix(cfg.BaseURL, "/") {
+		cfg.BaseURL += "/"
 	}
 
+	return cfg
 }
