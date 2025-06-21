@@ -26,10 +26,10 @@ func (s *MapStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortL
 	return nil
 }
 
-func (s *MapStorage) GetOriginalURL(ctx context.Context, shortUrl string) (string, error) {
+func (s *MapStorage) GetOriginalURL(ctx context.Context, shortURL string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	url, exists := s.data[shortUrl]
+	url, exists := s.data[shortURL]
 	if !exists {
 		return "", fmt.Errorf("original URL not found")
 	}

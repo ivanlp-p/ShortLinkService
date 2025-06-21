@@ -74,8 +74,8 @@ func (fs *FileStorage) PutOriginalURL(ctx context.Context, shortLink models.Shor
 	return err
 }
 
-func (fs *FileStorage) GetOriginalURL(ctx context.Context, shortUrl string) (string, error) {
-	originalURL, err := fs.store.GetOriginalURL(ctx, shortUrl)
+func (fs *FileStorage) GetOriginalURL(ctx context.Context, shortURL string) (string, error) {
+	originalURL, err := fs.store.GetOriginalURL(ctx, shortURL)
 	if err != nil {
 		return "", errors.New("original URL not found")
 	}

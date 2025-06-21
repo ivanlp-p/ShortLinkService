@@ -58,9 +58,9 @@ func (p PostgresStorage) PutOriginalURL(ctx context.Context, shortLink models.Sh
 	return err
 }
 
-func (p PostgresStorage) GetOriginalURL(ctx context.Context, shortUrl string) (string, error) {
+func (p PostgresStorage) GetOriginalURL(ctx context.Context, shortURL string) (string, error) {
 	var originalURL string
-	err := p.pool.QueryRow(ctx, `SELECT original_url FROM urls WHERE short_url = $1`, shortUrl).Scan(&originalURL)
+	err := p.pool.QueryRow(ctx, `SELECT original_url FROM urls WHERE short_url = $1`, shortURL).Scan(&originalURL)
 
 	if err == pgx.ErrNoRows {
 		return "", fmt.Errorf("URL not found")
