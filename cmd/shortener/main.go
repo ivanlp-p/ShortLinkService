@@ -23,6 +23,7 @@ var cfg config.Config
 
 func handler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Log.Info("This is handler")
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -48,8 +49,9 @@ func handler(storage storage.Storage) http.HandlerFunc {
 
 func handlerGet(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Log.Info("This is handlerGet")
 		fmt.Println("ID: ", chi.URLParam(r, "id"))
-
+		logger.Log.Info("ID: ", zap.String("id - ", chi.URLParam(r, "id")))
 		id := chi.URLParam(r, "id")
 
 		originalURL, err := storage.GetOriginalURL(context.Background(), id)
@@ -135,9 +137,9 @@ func main() {
 	strg := initStorage(cfg)
 
 	r := chi.NewRouter()
+	r.Get("/{id}", handlerGet(strg))
+	r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg))))
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg))))
-		r.Get("{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg)))
 		})
