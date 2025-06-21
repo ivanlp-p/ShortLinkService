@@ -74,6 +74,6 @@ func (p PostgresStorage) Ping(ctx context.Context) error {
 }
 
 func (p PostgresStorage) Close() error {
-	p.Close()
+	_ = p.pool.Close
 	return nil
 }
