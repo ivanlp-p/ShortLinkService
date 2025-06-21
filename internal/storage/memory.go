@@ -31,7 +31,7 @@ func (s *MapStorage) GetOriginalURL(ctx context.Context, shortUrl string) (strin
 	defer s.mu.Unlock()
 	url, exists := s.data[shortUrl]
 	if !exists {
-		return "", fmt.Errorf("Original URL not found")
+		return "", fmt.Errorf("original URL not found")
 	}
 
 	return url, nil
