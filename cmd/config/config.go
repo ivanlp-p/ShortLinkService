@@ -12,7 +12,7 @@ const (
 	hostFlagUsage = "Address to launch the HTTP server"
 
 	baseURLFlagName  = "b"
-	defaultEndpoint  = "http://localhost:8080"
+	defaultEndpoint  = "http://localhost:8080/"
 	baseURLFlagUsage = "Base URL for shortened links"
 
 	logLevelFlagName  = "l"
