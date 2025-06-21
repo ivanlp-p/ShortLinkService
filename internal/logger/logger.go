@@ -56,6 +56,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 func RequestLogger(h http.Handler) http.HandlerFunc {
 	logFunc := func(w http.ResponseWriter, r *http.Request) {
+		Log.Info("RequestLogger ", zap.String("Method = ", r.Method))
 		start := time.Now()
 
 		responseData := &responseData{
