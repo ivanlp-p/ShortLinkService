@@ -1,6 +1,8 @@
 package compress
 
 import (
+	"github.com/ivanlp-p/ShortLinkService/internal/logger"
+	"go.uber.org/zap"
 	"net/http"
 	"strings"
 )
@@ -12,6 +14,7 @@ const (
 
 func GzipCompress(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Log.Info("GzipCompress", zap.String("Method =", r.Method))
 		ow := w
 
 		acceptEncoding := r.Header.Get("Accept-Encoding")
