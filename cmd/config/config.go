@@ -20,7 +20,7 @@ const (
 	logLevelFlagUsage = "Log level"
 
 	fileStorageFlagName    = "f"
-	defaultFileStoragePath = "/tmp/short-url-db.json"
+	defaultFileStoragePath = "" // /tmp/short-url-db.json
 	fileStorageFlagUsage
 
 	databaseFlagName    = "d"
