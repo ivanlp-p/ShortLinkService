@@ -66,6 +66,9 @@ func (fs *FileStorage) PutOriginalURL(ctx context.Context, shortLink models.Shor
 		return err
 	}
 	_, err = file.WriteString(string(jsonLine) + "\n")
+	if err != nil {
+		return err
+	}
 
 	err = fs.store.PutOriginalURL(ctx, shortLink)
 	if err != nil {
