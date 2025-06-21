@@ -36,37 +36,50 @@ type Config struct {
 	DB          string
 }
 
-func Init() Config {
-	var cfg Config
+var config *Config
 
-	flag.StringVar(&cfg.Address, hostFlagName, defaultPort, hostFlagUsage)
-	flag.StringVar(&cfg.BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
-	flag.StringVar(&cfg.LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
-	flag.StringVar(&cfg.FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
-	flag.StringVar(&cfg.DB, databaseFlagName, defaultDatabasePath, databaseFlagUsage)
+func Init() *Config {
+	if config != nil {
+		return config
+	}
+
+	parseFlags()
+	return config
+}
+
+func parseFlags() *Config {
+
+	if config == nil {
+		config = &Config{}
+	}
+	flag.StringVar(&config.Address, hostFlagName, defaultPort, hostFlagUsage)
+	flag.StringVar(&config.BaseURL, baseURLFlagName, defaultEndpoint, baseURLFlagUsage)
+	flag.StringVar(&config.LogLevel, logLevelFlagName, defaultLogLevel, logLevelFlagUsage)
+	flag.StringVar(&config.FileStorage, fileStorageFlagName, defaultFileStoragePath, fileStorageFlagUsage)
+	flag.StringVar(&config.DB, databaseFlagName, defaultDatabasePath, databaseFlagUsage)
 
 	flag.Parse()
 
 	if envRunHostAddr := os.Getenv("HOST_ADDRESS"); envRunHostAddr != "" {
-		cfg.Address = envRunHostAddr
+		config.Address = envRunHostAddr
 	}
 	if envRunBaseURL := os.Getenv("BASE_URL"); envRunBaseURL != "" {
-		cfg.BaseURL = envRunBaseURL
+		config.BaseURL = envRunBaseURL
 	}
 	if envRunLogLevel := os.Getenv("LOG_LEVEL"); envRunLogLevel != "" {
-		cfg.LogLevel = envRunLogLevel
+		config.LogLevel = envRunLogLevel
 	}
 	if envRunFileStorage := os.Getenv("FILE_STORAGE_PATH"); envRunFileStorage != "" {
-		cfg.FileStorage = envRunFileStorage
+		config.FileStorage = envRunFileStorage
 	}
 	if envRunDatabase := os.Getenv("DATABASE_DSN"); envRunDatabase != "" {
-		cfg.DB = envRunDatabase
+		config.DB = envRunDatabase
 	}
 
 	// Убедиться, что baseURL заканчивается на /
-	if !strings.HasSuffix(cfg.BaseURL, "/") {
-		cfg.BaseURL += "/"
+	if !strings.HasSuffix(config.BaseURL, "/") {
+		config.BaseURL += "/"
 	}
 
-	return cfg
+	return config
 }

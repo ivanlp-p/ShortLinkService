@@ -16,7 +16,7 @@ import (
 )
 
 func Test_handler(t *testing.T) {
-	cfg = config.Config{BaseURL: "http://localhost:8080/"}
+	conf := config.Init()
 	store := storage.NewMapStorage()
 	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
@@ -56,7 +56,7 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(fileStorage)
+			h := handler(fileStorage, conf)
 			h(w, request)
 
 			result := w.Result()
@@ -163,7 +163,7 @@ func Test_handlerGet(t *testing.T) {
 }
 
 func Test_PostShortenRequest(t *testing.T) {
-	cfg = config.Config{BaseURL: "http://localhost:8080/"}
+	conf := config.Init()
 	store := storage.NewMapStorage()
 	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 	request := "/api/shorten/"
@@ -216,7 +216,7 @@ func Test_PostShortenRequest(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			request := httptest.NewRequest(tc.method, request, bytes.NewBufferString(tc.body))
 			w := httptest.NewRecorder()
-			h := PostShortenRequest(fileStorage)
+			h := PostShortenRequest(fileStorage, conf)
 			h(w, request)
 
 			result := w.Result()

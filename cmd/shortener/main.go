@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/httplog/v3"
 	"github.com/google/uuid"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
 	"github.com/ivanlp-p/ShortLinkService/internal/compress"
@@ -16,15 +15,11 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"log"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 )
 
-var cfg config.Config
-
-func handler(storage storage.Storage) http.HandlerFunc {
+func handler(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger.Log.Info("This is handler")
 		body, err := io.ReadAll(r.Body)
@@ -42,7 +37,7 @@ func handler(storage storage.Storage) http.HandlerFunc {
 
 		storage.PutOriginalURL(context.Background(), shortLink)
 
-		shortURL := fmt.Sprintf("http://localhost:8080/"+"%s", shortID)
+		shortURL := fmt.Sprintf(conf.BaseURL+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
@@ -77,7 +72,7 @@ func handlerGet(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func PostShortenRequest(storage storage.Storage) http.HandlerFunc {
+func PostShortenRequest(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var originURL models.OriginalURL
 
@@ -99,7 +94,7 @@ func PostShortenRequest(storage storage.Storage) http.HandlerFunc {
 		}
 
 		storage.PutOriginalURL(context.Background(), shortLink)
-		shortURL := "http://localhost:8080/" + shortID
+		shortURL := conf.BaseURL + shortID
 
 		resp := models.ShortURL{
 			Result: shortURL,
@@ -129,102 +124,49 @@ func HandlerPing(storage storage.Storage) http.HandlerFunc {
 }
 
 func main() {
-	logFormat := httplog.SchemaECS.Concise(true)
-
-	loggerHttp := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		ReplaceAttr: logFormat.ReplaceAttr,
-	})).With(
-		slog.String("app", "example-app"),
-		slog.String("version", "v1.0.0-a1fa420"),
-		slog.String("env", "production"),
-	)
-	cfg := config.Init()
-
-	if err := initLogger(cfg.LogLevel); err != nil {
+	conf := config.Init()
+	if err := initLogger(config.Config{}.LogLevel); err != nil {
 		log.Fatal(err)
 	}
 
-	logger.Log.Info("Running server on", zap.String("Address", cfg.Address))
+	logger.Log.Info("Running server on", zap.String("Address", conf.Address))
 
-	//strg := initStorage(cfg)
-	store := storage.NewMapStorage()
+	strg := initStorage(conf)
+
 	r := chi.NewRouter()
 
-	r.Use(httplog.RequestLogger(loggerHttp, &httplog.Options{
-		// Level defines the verbosity of the request logs:
-		// slog.LevelDebug - log all responses (incl. OPTIONS)
-		// slog.LevelInfo  - log responses (excl. OPTIONS)
-		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
-		// slog.LevelError - log 5xx responses only
-		Level: slog.LevelInfo,
-
-		// Set log output to Elastic Common Schema (ECS) format.
-		Schema: httplog.SchemaECS,
-
-		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
-		// and middlewares. It returns HTTP 500 unless response status was already set.
-		//
-		// NOTE: Panics are logged as errors automatically, regardless of this setting.
-		RecoverPanics: true,
-
-		// Optionally, filter out some request logs.
-		Skip: func(req *http.Request, respStatus int) bool {
-			return respStatus == 404 || respStatus == 405
-		},
-
-		// Optionally, log selected request/response headers explicitly.
-		LogRequestHeaders:  []string{"Origin"},
-		LogResponseHeaders: []string{},
-
-		// Optionally, enable logging of request/response body based on custom conditions.
-		// Useful for debugging payload issues in development.
-		LogRequestBody:  isDebugHeaderSet,
-		LogResponseBody: isDebugHeaderSet,
-	}))
-
-	// Set request log attribute from within middleware.
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-
-			httplog.SetAttrs(ctx, slog.String("user", "user1"))
-
-			next.ServeHTTP(w, r.WithContext(ctx))
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg, conf))))
+		r.Route("/api/", func(r chi.Router) {
+			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg, conf)))
 		})
+		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))
 	})
-
-	r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(store))))
-	r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(store))))
-	//r.Route("/", func(r chi.Router) {
-	//	r.Route("/api/", func(r chi.Router) {
-	//		r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg)))
-	//	})
-	//	r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))
-	//})
 
 	chi.Walk(r, func(method, route string, h http.Handler, m ...func(http.Handler) http.Handler) error {
 		fmt.Printf("%-6s %s\n", method, route)
 		return nil
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(conf.Address, r))
 }
 
-func initStorage(cfg config.Config) storage.Storage {
+func initStorage(conf *config.Config) storage.Storage {
 	var strg storage.Storage
-	//var err error
+	var err error
 
 	store := storage.NewMapStorage()
 
-	//if cfg.DB != "" {
-	//	strg, err = storage.NewPostgresStorage(context.Background(), cfg.DB)
-	//	if err != nil {
-	//		logger.Log.Error("Failed to initialize PostgreSQL storage: %v. Falling back to file storage", zap.Error(err))
-	//	}
-	//}
+	if conf.DB != "" {
+		strg, err = storage.NewPostgresStorage(context.Background(), conf.DB)
+		if err != nil {
+			logger.Log.Error("Failed to initialize PostgreSQL storage: %v. Falling back to file storage", zap.Error(err))
+		}
+	}
 
-	if strg == nil && cfg.FileStorage != "" {
-		strg = storage.NewFileStorage(cfg.FileStorage, store)
+	if strg == nil && conf.FileStorage != "" {
+		strg = storage.NewFileStorage(conf.FileStorage, store)
 		err := strg.LoadFromFile()
 		if err != nil {
 			logger.Log.Error("Store not load")
@@ -235,12 +177,6 @@ func initStorage(cfg config.Config) storage.Storage {
 		strg = store
 	}
 
-	//conn, err := pgx.Connect(context.Background(), cfg.DB)
-	//if err != nil {
-	//	logger.Log.Error("Database not initialize")
-	//}
-	//defer conn.Close(context.Background())
-
 	return strg
 }
 
@@ -250,8 +186,4 @@ func initLogger(logLevel string) error {
 	}
 
 	return nil
-}
-
-func isDebugHeaderSet(r *http.Request) bool {
-	return r.Header.Get("Debug") == "reveal-body-logs"
 }
