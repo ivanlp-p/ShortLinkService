@@ -137,7 +137,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg))))
-		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
+		r.Get("{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg)))
 		})
