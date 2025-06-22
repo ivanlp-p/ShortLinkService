@@ -94,6 +94,11 @@ func PostShortenRequest(storage storage.Storage, conf *config.Config) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		var originURL models.OriginalURL
 
+		if r.Method != http.MethodPost {
+			http.Error(w, "Bad Request", http.StatusMethodNotAllowed)
+			return
+		}
+
 		if err := json.NewDecoder(r.Body).Decode(&originURL); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
