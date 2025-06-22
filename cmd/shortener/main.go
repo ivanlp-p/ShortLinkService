@@ -123,7 +123,7 @@ func HandlerPing(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func HandlerShortenBatch(storage storage.Storage) http.HandlerFunc {
+func HandlerShortenBatch(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var batch []models.BatchRequest
 		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
@@ -149,8 +149,8 @@ func HandlerShortenBatch(storage storage.Storage) http.HandlerFunc {
 				OriginalURL: item.OriginalURL,
 			})
 			responses = append(responses, models.BatchResponse{
-				CorrelationId: item.CorrelationId,
-				ShortURL:      shortURL,
+				CorrelationID: item.CorrelationID,
+				ShortURL:      conf.BaseURL + shortURL,
 			})
 		}
 
@@ -189,7 +189,7 @@ func main() {
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(compress.GzipCompress(PostShortenRequest(strg, conf))))
 			r.Route("/shorten/", func(r chi.Router) {
-				r.Post("/batch", logger.RequestLogger(compress.GzipCompress(HandlerShortenBatch(strg))))
+				r.Post("/batch", logger.RequestLogger(compress.GzipCompress(HandlerShortenBatch(strg, conf))))
 			})
 		})
 		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))
@@ -199,12 +199,6 @@ func main() {
 		fmt.Printf("%-6s %s\n", method, route)
 		return nil
 	})
-
-	logger.Log.Info("flag", zap.String("a = ", conf.Address))
-	logger.Log.Info("flag", zap.String("b = ", conf.BaseURL))
-	logger.Log.Info("flag", zap.String("l = ", conf.LogLevel))
-	logger.Log.Info("flag", zap.String("f = ", conf.FileStorage))
-	logger.Log.Info("flag", zap.String("d = ", conf.DB))
 
 	log.Fatal(http.ListenAndServe(conf.Address, r))
 }
