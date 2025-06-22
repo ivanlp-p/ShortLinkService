@@ -52,6 +52,19 @@ func (s *MapStorage) BatchInsert(ctx context.Context, links []models.ShortLink) 
 	return nil
 }
 
+func (s *MapStorage) GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, bool, error) {
+	var shortURL = ""
+	exists := false
+	for k, v := range s.data {
+		if v == originalURL {
+			shortURL = k
+			exists = true
+		}
+	}
+
+	return shortURL, exists, nil
+}
+
 func (s *MapStorage) Ping(ctx context.Context) error {
 	return nil
 }

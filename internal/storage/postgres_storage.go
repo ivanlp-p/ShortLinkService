@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/jackc/pgx/v5"
@@ -43,6 +44,12 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("unable to acquire connection: %w", err)
 	}
 
+	_, err = conn.Exec(ctx,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url_unique ON urls (original_url);`)
+	if err != nil {
+		return fmt.Errorf("failed to create unique index: %w", err)
+	}
+
 	return err
 }
 
@@ -51,9 +58,8 @@ func (p PostgresStorage) LoadFromFile() error {
 }
 
 func (p PostgresStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortLink) error {
-	_, err := p.pool.Exec(ctx,
-		`insert into urls (uuid, short_url, original_url) values ($1,$2,$3) on conflict (short_url) Do nothing`,
-		shortLink.UUID, shortLink.ShortURL, shortLink.OriginalURL)
+	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES ($1, $2, $3)`
+	_, err := p.pool.Exec(ctx, query, shortLink.UUID, shortLink.ShortURL, shortLink.OriginalURL)
 
 	return err
 }
@@ -98,6 +104,20 @@ func (p PostgresStorage) BatchInsert(ctx context.Context, links []models.ShortLi
 
 	err = tx.Commit(ctx)
 	return err
+}
+
+func (p PostgresStorage) GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, bool, error) {
+	var shortURL string
+	err := p.pool.QueryRow(ctx, `SELECT short_url FROM urls WHERE original_url = $1`, originalURL).Scan(&shortURL)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", false, fmt.Errorf("URL not found")
+		}
+		return "", false, err
+	}
+
+	return shortURL, true, err
 }
 
 func (p PostgresStorage) Ping(ctx context.Context) error {

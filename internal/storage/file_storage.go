@@ -86,6 +86,10 @@ func (fs *FileStorage) GetOriginalURL(ctx context.Context, shortURL string) (str
 	return originalURL, nil
 }
 
+func (fs *FileStorage) GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, bool, error) {
+	return fs.store.GetShortURLByOriginalURL(ctx, originalURL)
+}
+
 func (fs *FileStorage) BatchInsert(ctx context.Context, links []models.ShortLink) error {
 	for _, item := range links {
 		err := fs.PutOriginalURL(ctx, item)

@@ -24,7 +24,7 @@ const (
 	fileStorageFlagUsage
 
 	databaseFlagName    = "d"
-	defaultDatabasePath = "" //postgres://postgres:GfdGjc964@localhost:5432/videos
+	defaultDatabasePath = "postgres://postgres:GfdGjc964@localhost:5432/videos" //postgres://postgres:GfdGjc964@localhost:5432/videos
 	databaseFlagUsage   = "Database path"
 )
 

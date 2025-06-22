@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -12,6 +13,8 @@ import (
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -35,8 +38,23 @@ func handler(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 			OriginalURL: originalURL,
 		}
 
-		storage.PutOriginalURL(context.Background(), shortLink)
+		err = storage.PutOriginalURL(context.Background(), shortLink)
+		if err != nil {
+			var pgErr *pgconn.PgError
 
+			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+				if existingShort, found, err := storage.GetShortURLByOriginalURL(context.Background(), originalURL); err == nil && found {
+					shortURL := fmt.Sprintf(conf.BaseURL+"%s", existingShort)
+					w.Header().Set("Content-Type", "text/plain")
+					w.WriteHeader(http.StatusConflict)
+					w.Write([]byte(shortURL))
+					return
+				}
+			}
+
+			http.Error(w, "Failed to save", http.StatusInternalServerError)
+			return
+		}
 		shortURL := fmt.Sprintf(conf.BaseURL+"%s", shortID)
 
 		w.Header().Set("Content-Type", "text/plain")
@@ -76,11 +94,6 @@ func PostShortenRequest(storage storage.Storage, conf *config.Config) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		var originURL models.OriginalURL
 
-		if r.Method != http.MethodPost {
-			http.Error(w, "Bad Request", http.StatusMethodNotAllowed)
-			return
-		}
-
 		if err := json.NewDecoder(r.Body).Decode(&originURL); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -93,7 +106,31 @@ func PostShortenRequest(storage storage.Storage, conf *config.Config) http.Handl
 			OriginalURL: url,
 		}
 
-		storage.PutOriginalURL(context.Background(), shortLink)
+		if err := storage.PutOriginalURL(context.Background(), shortLink); err != nil {
+			var pgErr *pgconn.PgError
+
+			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+				if existingShort, found, err := storage.GetShortURLByOriginalURL(context.Background(), originURL.URL); err == nil && found {
+					shortURL := fmt.Sprintf(conf.BaseURL+"%s", existingShort)
+					resp := models.ShortURL{
+						Result: shortURL,
+					}
+
+					response, err := json.MarshalIndent(resp, "", "   ")
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusConflict)
+					w.Write(response)
+					return
+				}
+			}
+
+			http.Error(w, "Failed to save", http.StatusInternalServerError)
+			return
+		}
 		shortURL := conf.BaseURL + shortID
 
 		resp := models.ShortURL{
