@@ -37,14 +37,25 @@ func (s *MapStorage) GetOriginalURL(ctx context.Context, shortURL string) (strin
 	return url, nil
 }
 
+func (s *MapStorage) LoadFromFile() error {
+	return nil
+}
+
+func (s *MapStorage) BatchInsert(ctx context.Context, links []models.ShortLink) error {
+	for _, item := range links {
+		err := s.PutOriginalURL(ctx, item)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *MapStorage) Ping(ctx context.Context) error {
 	return nil
 }
 
 func (s *MapStorage) Close() error {
-	return nil
-}
-
-func (s *MapStorage) LoadFromFile() error {
 	return nil
 }

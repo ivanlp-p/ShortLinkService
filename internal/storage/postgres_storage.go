@@ -69,6 +69,37 @@ func (p PostgresStorage) GetOriginalURL(ctx context.Context, shortURL string) (s
 	return originalURL, err
 }
 
+func (p PostgresStorage) BatchInsert(ctx context.Context, links []models.ShortLink) error {
+	if len(links) == 0 {
+		return nil
+	}
+
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	stmt := `INSERT INTO urls (uuid, short_url, original_url)
+	         VALUES ($1, $2, $3)
+	         ON CONFLICT (short_url) DO NOTHING`
+
+	for _, item := range links {
+		_, err = tx.Exec(ctx, stmt, item.UUID, item.ShortURL, item.OriginalURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit(ctx)
+	return err
+}
+
 func (p PostgresStorage) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)
 }

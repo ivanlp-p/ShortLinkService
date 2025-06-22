@@ -123,9 +123,57 @@ func HandlerPing(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
+func HandlerShortenBatch(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var batch []models.BatchRequest
+		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if len(batch) == 0 {
+			http.Error(w, "Empty batch", http.StatusBadRequest)
+			return
+		}
+
+		records := make([]models.ShortLink, 0, len(batch))
+		responses := make([]models.BatchResponse, 0, len(batch))
+
+		for _, item := range batch {
+			shortURL := utils.ShortenURL(item.OriginalURL)
+			UUID := uuid.NewString()
+
+			records = append(records, models.ShortLink{
+				UUID:        UUID,
+				ShortURL:    shortURL,
+				OriginalURL: item.OriginalURL,
+			})
+			responses = append(responses, models.BatchResponse{
+				CorrelationId: item.CorrelationId,
+				ShortURL:      shortURL,
+			})
+		}
+
+		if err := storage.BatchInsert(context.Background(), records); err != nil {
+			http.Error(w, "Failed to save batch", http.StatusInternalServerError)
+			return
+		}
+
+		respJSON, err := json.Marshal(responses)
+		if err != nil {
+			http.Error(w, "Encoding error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write(respJSON)
+	}
+}
+
 func main() {
 	conf := config.Init()
-	if err := initLogger(config.Config{}.LogLevel); err != nil {
+	if err := initLogger(conf.LogLevel); err != nil {
 		log.Fatal(err)
 	}
 
@@ -139,7 +187,10 @@ func main() {
 		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
 		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg, conf))))
 		r.Route("/api/", func(r chi.Router) {
-			r.Post("/shorten", logger.RequestLogger(PostShortenRequest(strg, conf)))
+			r.Post("/shorten", logger.RequestLogger(compress.GzipCompress(PostShortenRequest(strg, conf))))
+			r.Route("/shorten/", func(r chi.Router) {
+				r.Post("/batch", logger.RequestLogger(compress.GzipCompress(HandlerShortenBatch(strg))))
+			})
 		})
 		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))
 	})
@@ -148,6 +199,12 @@ func main() {
 		fmt.Printf("%-6s %s\n", method, route)
 		return nil
 	})
+
+	logger.Log.Info("flag", zap.String("a = ", conf.Address))
+	logger.Log.Info("flag", zap.String("b = ", conf.BaseURL))
+	logger.Log.Info("flag", zap.String("l = ", conf.LogLevel))
+	logger.Log.Info("flag", zap.String("f = ", conf.FileStorage))
+	logger.Log.Info("flag", zap.String("d = ", conf.DB))
 
 	log.Fatal(http.ListenAndServe(conf.Address, r))
 }
