@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 )
 
 func Test_handler(t *testing.T) {
-	config.BaseURL = "http://localhost:8080/"
+	conf := config.Init()
 	store := storage.NewMapStorage()
 	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
@@ -55,7 +56,7 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(fileStorage)
+			h := handler(fileStorage, conf)
 			h(w, request)
 
 			result := w.Result()
@@ -91,7 +92,11 @@ func Test_handler(t *testing.T) {
 
 func Test_handlerGet(t *testing.T) {
 	store := storage.NewMapStorage()
-	store.Set("-8eOIgoJ", "https://rcimbvs.com/iuymedy")
+	shortLink := models.ShortLink{
+		ShortURL:    "-8eOIgoJ",
+		OriginalURL: "https://rcimbvs.com/iuymedy",
+	}
+	store.PutOriginalURL(context.Background(), shortLink)
 	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 
 	type want struct {
@@ -158,7 +163,7 @@ func Test_handlerGet(t *testing.T) {
 }
 
 func Test_PostShortenRequest(t *testing.T) {
-	config.BaseURL = "http://localhost:8080/"
+	conf := config.Init()
 	store := storage.NewMapStorage()
 	fileStorage := storage.NewFileStorage("/tmp/short-url-db.json", store)
 	request := "/api/shorten/"
@@ -211,7 +216,7 @@ func Test_PostShortenRequest(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			request := httptest.NewRequest(tc.method, request, bytes.NewBufferString(tc.body))
 			w := httptest.NewRecorder()
-			h := PostShortenRequest(fileStorage)
+			h := PostShortenRequest(fileStorage, conf)
 			h(w, request)
 
 			result := w.Result()

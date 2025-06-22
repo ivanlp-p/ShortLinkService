@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
@@ -15,7 +16,7 @@ type FileStorage struct {
 	mx       sync.RWMutex
 }
 
-func NewFileStorage(fileName string, store *MapStorage) *FileStorage {
+func NewFileStorage(fileName string, store *MapStorage) Storage {
 	return &FileStorage{
 		fileName: fileName,
 		store:    store,
@@ -41,21 +42,16 @@ func (fs *FileStorage) LoadFromFile() error {
 		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
 			return err
 		}
-		fs.store.Set(record.ShortURL, record.OriginalURL)
+
+		err = fs.store.PutOriginalURL(context.Background(), record)
+		if err != nil {
+			return err
+		}
 	}
 	return scanner.Err()
 }
 
-func (fs *FileStorage) GetOriginalURL(id string) (string, error) {
-	originalURL, ok := fs.store.Get(id)
-	if !ok {
-		return "", errors.New("original URL not found")
-	}
-
-	return originalURL, nil
-}
-
-func (fs *FileStorage) SaveShortLink(shortLink models.ShortLink) error {
+func (fs *FileStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortLink) error {
 	fs.mx.Lock()
 	defer fs.mx.Unlock()
 
@@ -70,6 +66,45 @@ func (fs *FileStorage) SaveShortLink(shortLink models.ShortLink) error {
 		return err
 	}
 	_, err = file.WriteString(string(jsonLine) + "\n")
-	fs.store.Set(shortLink.ShortURL, shortLink.OriginalURL)
+	if err != nil {
+		return err
+	}
+
+	err = fs.store.PutOriginalURL(ctx, shortLink)
+	if err != nil {
+		return err
+	}
 	return err
+}
+
+func (fs *FileStorage) GetOriginalURL(ctx context.Context, shortURL string) (string, error) {
+	originalURL, err := fs.store.GetOriginalURL(ctx, shortURL)
+	if err != nil {
+		return "", errors.New("original URL not found")
+	}
+
+	return originalURL, nil
+}
+
+func (fs *FileStorage) GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, bool, error) {
+	return fs.store.GetShortURLByOriginalURL(ctx, originalURL)
+}
+
+func (fs *FileStorage) BatchInsert(ctx context.Context, links []models.ShortLink) error {
+	for _, item := range links {
+		err := fs.PutOriginalURL(ctx, item)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (fs *FileStorage) Close() error {
+	return nil
 }
