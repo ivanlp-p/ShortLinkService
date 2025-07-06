@@ -16,7 +16,7 @@ type FileStorage struct {
 	mx       sync.RWMutex
 }
 
-func NewFileStorage(fileName string, store *MapStorage) Storage {
+func NewFileStorage(fileName string, store *MapStorage) *FileStorage {
 	return &FileStorage{
 		fileName: fileName,
 		store:    store,

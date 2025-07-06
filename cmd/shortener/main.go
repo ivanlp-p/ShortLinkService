@@ -15,6 +15,7 @@ import (
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -247,12 +248,15 @@ func main() {
 
 func initStorage(conf *config.Config) storage.Storage {
 	var strg storage.Storage
-	var err error
 
 	store := storage.NewMapStorage()
 
 	if conf.DB != "" {
-		strg, err = storage.NewPostgresStorage(context.Background(), conf.DB)
+		pool, err := pgxpool.New(context.Background(), conf.DB)
+		if err != nil {
+			logger.Log.Error("Failed to initialize PostgreSQL storage")
+		}
+		strg, err = storage.NewPostgresStorage(context.Background(), pool)
 		if err != nil {
 			logger.Log.Error("Failed to initialize PostgreSQL storage: %v. Falling back to file storage", zap.Error(err))
 		}

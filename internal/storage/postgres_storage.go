@@ -13,17 +13,13 @@ type PostgresStorage struct {
 	pool *pgxpool.Pool
 }
 
-func NewPostgresStorage(ctx context.Context, dsn string) (Storage, error) {
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create connection pool: %w", err)
-	}
+func NewPostgresStorage(ctx context.Context, pool *pgxpool.Pool) (*PostgresStorage, error) {
 
 	if err := pool.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
 
-	if err = createTables(ctx, pool); err != nil {
+	if err := createTables(ctx, pool); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
@@ -57,7 +53,7 @@ func (p PostgresStorage) LoadFromFile() error {
 	return nil
 }
 
-func (p PostgresStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortLink) error {
+func (p *PostgresStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortLink) error {
 	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES ($1, $2, $3)`
 	_, err := p.pool.Exec(ctx, query, shortLink.UUID, shortLink.ShortURL, shortLink.OriginalURL)
 
