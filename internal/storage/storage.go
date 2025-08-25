@@ -12,5 +12,6 @@ type Storage interface {
 	BatchInsert(ctx context.Context, links []models.ShortLink) error
 	GetShortURLByOriginalURL(ctx context.Context, originalURL string) (string, bool, error)
 	Ping(ctx context.Context) error
+	GetUrlsByUserID(ctx context.Context, userID string) ([]models.ShortLink, error)
 	Close() error
 }

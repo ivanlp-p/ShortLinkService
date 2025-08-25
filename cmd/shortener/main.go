@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
 	"github.com/ivanlp-p/ShortLinkService/internal/compress"
+	"github.com/ivanlp-p/ShortLinkService/internal/handler"
 	"github.com/ivanlp-p/ShortLinkService/internal/logger"
+	"github.com/ivanlp-p/ShortLinkService/internal/middleware"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/ivanlp-p/ShortLinkService/internal/utils"
@@ -23,9 +25,15 @@ import (
 	"strings"
 )
 
-func handler(storage storage.Storage, conf *config.Config) http.HandlerFunc {
+func handlerPost(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Log.Info("This is handler")
+		userID, ok := middleware.GetUserID(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		logger.Log.Info("This is handlerPost")
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -35,6 +43,7 @@ func handler(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 		shortID := utils.ShortenURL(originalURL)
 		shortLink := models.ShortLink{
 			UUID:        uuid.NewString(),
+			UserID:      userID,
 			ShortURL:    shortID,
 			OriginalURL: originalURL,
 		}
@@ -168,6 +177,12 @@ func HandlerPing(storage storage.Storage) http.HandlerFunc {
 
 func HandlerShortenBatch(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := middleware.GetUserID(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		var batch []models.BatchRequest
 		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -188,6 +203,7 @@ func HandlerShortenBatch(storage storage.Storage, conf *config.Config) http.Hand
 
 			records = append(records, models.ShortLink{
 				UUID:        UUID,
+				UserID:      userID,
 				ShortURL:    shortURL,
 				OriginalURL: item.OriginalURL,
 			})
@@ -226,13 +242,18 @@ func main() {
 
 	r := chi.NewRouter()
 
+	r.Use(middleware.AuthMiddleware)
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", logger.RequestLogger(compress.GzipCompress(handlerGet(strg))))
-		r.Post("/", logger.RequestLogger(compress.GzipCompress(handler(strg, conf))))
+		r.Post("/", logger.RequestLogger(compress.GzipCompress(handlerPost(strg, conf))))
 		r.Route("/api/", func(r chi.Router) {
 			r.Post("/shorten", logger.RequestLogger(compress.GzipCompress(PostShortenRequest(strg, conf))))
 			r.Route("/shorten/", func(r chi.Router) {
 				r.Post("/batch", logger.RequestLogger(compress.GzipCompress(HandlerShortenBatch(strg, conf))))
+			})
+			r.Route("/user/", func(r chi.Router) {
+				r.Get("/urls", logger.RequestLogger(compress.GzipCompress(handler.GetUrlsByUserID(strg, conf))))
 			})
 		})
 		r.Get("/ping", logger.RequestLogger(compress.GzipCompress(HandlerPing(strg))))

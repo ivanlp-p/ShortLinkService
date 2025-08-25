@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/ivanlp-p/ShortLinkService/cmd/config"
+	"github.com/ivanlp-p/ShortLinkService/internal/middleware"
 	"github.com/ivanlp-p/ShortLinkService/internal/models"
 	"github.com/ivanlp-p/ShortLinkService/internal/storage"
 	"github.com/stretchr/testify/assert"
@@ -56,8 +57,8 @@ func Test_handler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, tt.request, bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h := handler(fileStorage, conf)
-			h(w, request)
+			h := middleware.AuthMiddleware(handlerPost(fileStorage, conf))
+			h.ServeHTTP(w, request)
 
 			result := w.Result()
 

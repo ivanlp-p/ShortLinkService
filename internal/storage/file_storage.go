@@ -101,6 +101,10 @@ func (fs *FileStorage) BatchInsert(ctx context.Context, links []models.ShortLink
 	return nil
 }
 
+func (fs *FileStorage) GetUrlsByUserID(ctx context.Context, userID string) ([]models.ShortLink, error) {
+	return nil, nil
+}
+
 func (fs *FileStorage) Ping(ctx context.Context) error {
 	return nil
 }
