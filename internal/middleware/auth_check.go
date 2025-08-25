@@ -6,11 +6,15 @@ import (
 	"net/http"
 )
 
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if userID, ok := cookie.ValidateAuthCookie(r); ok {
 			// если кука валидна, добавить userID в контекст
-			ctx := context.WithValue(r.Context(), "userID", userID)
+			ctx := context.WithValue(r.Context(), userIDKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -19,7 +23,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		userID := cookie.GenerateUserID()
 		http.SetCookie(w, cookie.MakeSignedCookie(userID))
 
-		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
