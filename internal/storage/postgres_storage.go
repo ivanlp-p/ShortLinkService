@@ -35,7 +35,13 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 	defer conn.Release()
 
 	_, err = conn.Exec(ctx,
-		`CREATE TABLE IF NOT EXISTS urls (uuid TEXT primary key, short_url TEXT NOT NULL UNIQUE,original_url TEXT NOT NULL);`)
+		`CREATE TABLE IF NOT EXISTS urls (
+    uuid TEXT primary key,
+     user_id TEXT NOT NULL,
+      short_url TEXT NOT NULL UNIQUE,
+      original_url TEXT NOT NULL);
+`)
+
 	if err != nil {
 		return fmt.Errorf("unable to acquire connection: %w", err)
 	}
@@ -54,8 +60,8 @@ func (p PostgresStorage) LoadFromFile() error {
 }
 
 func (p *PostgresStorage) PutOriginalURL(ctx context.Context, shortLink models.ShortLink) error {
-	query := `INSERT INTO urls (uuid, short_url, original_url) VALUES ($1, $2, $3)`
-	_, err := p.pool.Exec(ctx, query, shortLink.UUID, shortLink.ShortURL, shortLink.OriginalURL)
+	query := `INSERT INTO urls (uuid, user_id, short_url, original_url) VALUES ($1, $2, $3, $4)`
+	_, err := p.pool.Exec(ctx, query, shortLink.UUID, shortLink.UserID, shortLink.ShortURL, shortLink.OriginalURL)
 
 	return err
 }
@@ -87,12 +93,12 @@ func (p PostgresStorage) BatchInsert(ctx context.Context, links []models.ShortLi
 		}
 	}()
 
-	stmt := `INSERT INTO urls (uuid, short_url, original_url)
-	         VALUES ($1, $2, $3)
+	stmt := `INSERT INTO urls (uuid, user_id, short_url, original_url)
+	         VALUES ($1, $2, $3, $4)
 	         ON CONFLICT (short_url) DO NOTHING`
 
 	for _, item := range links {
-		_, err = tx.Exec(ctx, stmt, item.UUID, item.ShortURL, item.OriginalURL)
+		_, err = tx.Exec(ctx, stmt, item.UUID, item.UserID, item.ShortURL, item.OriginalURL)
 		if err != nil {
 			return err
 		}
@@ -114,6 +120,26 @@ func (p PostgresStorage) GetShortURLByOriginalURL(ctx context.Context, originalU
 	}
 
 	return shortURL, true, err
+}
+
+func (p PostgresStorage) GetUrlsByUserID(ctx context.Context, userID string) ([]models.ShortLink, error) {
+	var links []models.ShortLink
+
+	rows, err := p.pool.Query(ctx, `SELECT uuid, short_url, original_url FROM urls WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var link models.ShortLink
+		link.UserID = userID
+		if err := rows.Scan(&link.UUID, &link.ShortURL, &link.OriginalURL); err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+
+	return links, rows.Err()
 }
 
 func (p PostgresStorage) Ping(ctx context.Context) error {

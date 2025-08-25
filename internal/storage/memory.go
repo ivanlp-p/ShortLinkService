@@ -65,6 +65,10 @@ func (s *MapStorage) GetShortURLByOriginalURL(ctx context.Context, originalURL s
 	return shortURL, exists, nil
 }
 
+func (s *MapStorage) GetUrlsByUserID(ctx context.Context, userID string) ([]models.ShortLink, error) {
+	return nil, nil
+}
+
 func (s *MapStorage) Ping(ctx context.Context) error {
 	return nil
 }
