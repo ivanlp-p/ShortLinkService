@@ -27,11 +27,12 @@ import (
 
 func handlerPost(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID")
-		if userID == nil {
+		userID, ok := middleware.GetUserID(r)
+		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+
 		logger.Log.Info("This is handlerPost")
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) == 0 {
@@ -42,7 +43,7 @@ func handlerPost(storage storage.Storage, conf *config.Config) http.HandlerFunc 
 		shortID := utils.ShortenURL(originalURL)
 		shortLink := models.ShortLink{
 			UUID:        uuid.NewString(),
-			UserID:      userID.(string),
+			UserID:      userID,
 			ShortURL:    shortID,
 			OriginalURL: originalURL,
 		}
@@ -176,8 +177,8 @@ func HandlerPing(storage storage.Storage) http.HandlerFunc {
 
 func HandlerShortenBatch(storage storage.Storage, conf *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID")
-		if userID == nil {
+		userID, ok := middleware.GetUserID(r)
+		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -202,7 +203,7 @@ func HandlerShortenBatch(storage storage.Storage, conf *config.Config) http.Hand
 
 			records = append(records, models.ShortLink{
 				UUID:        UUID,
-				UserID:      userID.(string),
+				UserID:      userID,
 				ShortURL:    shortURL,
 				OriginalURL: item.OriginalURL,
 			})
